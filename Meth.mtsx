@@ -1,0 +1,14 @@
+{
+  name: ["Meth", ".mh", ".meth"]
+  comment: {startsWith: "#"}
+  contains: [
+      {builtin: #C_QUOTED_STRING#}
+      {builtin: #C_NUMBER#}
+      {match: keywordsToRegex(
+              "fun end return extern"
+              "i8 i16 i32 i64 i128"
+              "f16 f32 f64 f128"
+              "char"
+          ), 0: "keyword"}
+  ]
+}

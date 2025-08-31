@@ -1,0 +1,13 @@
+name: Meth
+version: 0.1.0
+
+authors:
+  - trindadedev13 <trindadedev13@gmail.com>
+
+targets:
+  meth:
+    main: src/meth.cr
+
+crystal: '>= 1.17.1'
+
+license: Apache 2.0
