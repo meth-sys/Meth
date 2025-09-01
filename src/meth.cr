@@ -6,10 +6,37 @@ module Meth
   extend self
   VERSION = "0.1.0"
 
-  # read the file passed by stdout
-  puts "Usage: meth main.mh" if ARGV.size != 1
+  keep = false
+  filename = ""
+
+  # Process ARGV
+  if ARGV.empty?
+    puts "Usage: meth [--keep|-k] <file>"
+    exit 1
+  end
+
+  ARGV.each do |arg|
+    case arg
+    when "-k", "--keep"
+      keep = true
+    else
+      if filename.empty?
+        filename = arg
+      else
+        puts "Unexpected argument: #{arg}"
+        exit 1
+      end
+    end
+  end
+
+  if filename.empty?
+    puts "Usage: meth [--keep|-k] <file>"
+    exit 1
+  end
+
+  # read the file
   content = ""
-  File.open(ARGV[0]) do |file|
+  File.open(filename) do |file|
     content = file.gets_to_end
   end
 
@@ -21,6 +48,10 @@ module Meth
   parser = Parser.new(tokens)
   nodes = parser.parse
 
+  nodes.each do |n|
+    puts n.to_s
+  end
+
   LLVM.init_native_target
 
   context = LLVM::Context.new
@@ -28,9 +59,9 @@ module Meth
   mod = generator.gen(nodes)
 
   # files
-  llvmir_out = ARGV[0].sub(".mh", ".ll")
-  asm_out = ARGV[0].sub(".mh", ".s")
-  exec_out = ARGV[0].sub(".mh", "")
+  llvmir_out = filename.sub(/\.\w+$/, ".ll")
+  asm_out = filename.sub(/\.\w+$/, ".s")
+  exec_out = filename.sub(/\.\w+$/, "")
 
   # generate IR and write to file
   File.open(llvmir_out, "w") do |f|
@@ -38,20 +69,18 @@ module Meth
   end
 
   # compile IR to Assembly
-  llc_status = system("llc #{llvmir_out}")
-  if !llc_status
+  unless system("llc #{llvmir_out}")
     puts "Failed to compile LLVM IR with LLC"
-    abort
+    exit 1
   end
 
   # compile final executable with gcc
-  gcc_status = system("gcc #{asm_out} -o #{exec_out}")
-  if !gcc_status
+  unless system("gcc -fsanitize=address -g #{asm_out} -o #{exec_out}")
     puts "Failed to compile Assembly to Executable."
-    abort
+    exit 1
   end
 
   # cleanup
-  File.delete(llvmir_out)
-  File.delete(asm_out)
+  File.delete(llvmir_out) unless keep
+  File.delete(asm_out) unless keep
 end

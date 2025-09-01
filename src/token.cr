@@ -11,6 +11,7 @@ module Meth
     String     # "Hello, world"
     Char       # 'A'...
     Type       # Standard Typed, See TYPES Const
+    Assign     # =
     Unknown    # Unknown???
     Eof        # \0, end
   end

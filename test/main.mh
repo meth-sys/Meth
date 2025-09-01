@@ -1,16 +1,12 @@
-# functions from libc
-extern fun puts(str: char*): i32
-extern fun putchar(value: char): i32
-extern fun write(fd: i32, value: void*, size: i64): i64
+extern fun write(fd: i32, data: void*, size: i64): i32
 
-fun printhi()
-  puts("Hello, world")
+fun print(data: void*, size: i64)
+  write(1, data, size)
 end
 
-# main entrypoint
-fun main(argv: char*): i32
-  printhi()
-  putchar('A')
-  write(1, "any", 3)
+fun main(): i32
+  char* hello = "Hello"
+  i64 size = 5
+  print(hello, size)
   return 0
 end

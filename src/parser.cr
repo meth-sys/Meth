@@ -21,11 +21,22 @@ module Meth
       @tokens[@pos + 1]
     end
 
+    def token_from(pos)
+      raise "Unexpected end of input at position #{pos}" if pos >= @tokens.size
+      @tokens[pos]
+    end
+
     def advance
       if @pos < @tokens.size
         @pos += 1
       end
       current_token
+    end
+
+    def consume
+      token = current_token
+      advance
+      token
     end
 
     def expect(type)
@@ -147,6 +158,14 @@ module Meth
       Ast::CallNode.new(name, args)
     end
 
+    def parse_var_decl(type)
+      name = expect(TokenType::Identifier).value
+      expect(TokenType::Assign)
+      value = parse_expression
+
+      Ast::VarDeclNode.new(name, type, value)
+    end
+
     def parse_expression
       case current_token.type
       when TokenType::String
@@ -155,6 +174,13 @@ module Meth
         Ast::LiteralNode.new(expect(TokenType::Number).value.to_i32)
       when TokenType::Char
         Ast::LiteralNode.new(expect(TokenType::Char).value.chars[0])
+      when TokenType::Identifier
+        name = expect(TokenType::Identifier).value
+        if current_token.type == TokenType::LParen
+          parse_call(name)
+        else
+          Ast::VarRefNode.new(name)
+        end
       else
         raise "Unsupported expression at #{current_token}"
       end
@@ -167,8 +193,22 @@ module Meth
     end
 
     def parse_identifier
-      name = expect(TokenType::Identifier).value
-      parse_call(name)
+      id = expect(TokenType::Identifier).value
+      if current_token.type == TokenType::Identifier
+        if next_token.type == TokenType::Assign
+          return parse_var_decl(id)
+        end
+      end
+      parse_call(id)
+    end
+
+    def parse_type
+      type = expect(TokenType::Type).value
+      if current_token.type == TokenType::Identifier
+        if next_token.type == TokenType::Assign
+          parse_var_decl(type)
+        end
+      end
     end
 
     def parse_statement
@@ -186,6 +226,8 @@ module Meth
           advance
           nil
         end
+      when TokenType::Type
+        parse_type
       when TokenType::Identifier
         parse_identifier
       else

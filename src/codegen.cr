@@ -1,12 +1,26 @@
 require "llvm"
 require "./ast.cr"
 
+class LLVMVariable
+  property type : LLVM::Type
+  property value : LLVM::Value
+  property is_pointer : Bool
+
+  def initialize(@type, @value, @is_pointer)
+  end
+
+  def to_s
+    "LLVMVariable: #{type} = #{value}"
+  end
+end
+
 module Meth
   class CodeGenerator
     @context : LLVM::Context
     @module : LLVM::Module
     @builder : LLVM::Builder
     @function_types = Hash(String, LLVM::Type).new
+    @variables = Hash(String, LLVMVariable).new
 
     def initialize(@context, mod_name : String)
       @module = @context.new_module(mod_name)
@@ -23,14 +37,13 @@ module Meth
       @module
     end
 
-    def get_llvm_type_from_meth(meth : String) : LLVM::Type
+    def get_llvm_type_from_meth(meth)
       # pointers, count the * in end
       ptr_depth = meth.count('*')
       base_type_str = meth.rstrip('*').strip
 
-      # Trata arrays fixos, tipo "i32[10]"
       # fixed arrays like i32[10]
-      if base_type_str =~ /(.*)\[(\d+)\]$/
+      if base_type_str =~ /(.*)(\d+)$/
         base_type_str = $1
         array_size = $2.to_i
         base_type = get_llvm_type_from_meth(base_type_str)
@@ -64,7 +77,7 @@ module Meth
     end
 
     def declare_fun(fn : Ast::FunctionNode)
-      return if @module.functions[fn.name]?
+      raise "Redeclaration of #{fn.name}" if @module.functions[fn.name]?
       return_type = get_llvm_type_from_meth(fn.return_type)
       arg_types = fn.params.map do |p|
         case p
@@ -80,14 +93,13 @@ module Meth
 
     def gen_fun(fn : Ast::FunctionNode)
       func = @module.functions[fn.name]
-
       block = func.basic_blocks.append("entry")
       @builder.position_at_end(block)
 
-      # named params
       fn.params.each_with_index do |param, i|
         if param.is_a?(Ast::ParamNode)
-          func.params[i].name = param.name
+          param_type = get_llvm_type_from_meth(param.type)
+          @variables[param.name] = LLVMVariable.new(param_type, func.params[i], false)
         end
       end
 
@@ -98,6 +110,70 @@ module Meth
       if fn.return_type == "void" && !ends_with_return?(fn.body)
         @builder.ret
       end
+    end
+
+    def get_var(name)
+      var = @variables[name]
+      raise "Variable #{name} not exists." if var.nil?
+      if var.is_pointer
+        @builder.load(var.type, var.value, name)
+      else
+        var.value
+      end
+    end
+
+    def gen_expr(node)
+      case node
+      when Ast::LiteralNode(Int32)
+        @context.int32.const_int(node.value)
+      when Ast::LiteralNode(Int64)
+        @context.int64.const_int(node.value)
+      when Ast::LiteralNode(String)
+        str = node.value
+        global_str = @module.globals.add(@context.int8.array(str.bytesize + 1), "str")
+        global_str.initializer = @context.const_string(str)
+        global_str.linkage = LLVM::Linkage::Private
+        global_str.global_constant = true
+        @builder.bit_cast(global_str, @context.int8.pointer)
+      when Ast::LiteralNode(Char)
+        @context.int8.const_int(node.value.ord)
+      when Ast::VarRefNode
+        get_var(node.name)
+      else
+        raise "Unhandled expr: #{node.class}"
+      end
+    end
+
+    def gen_call(node)
+      if func_type = @function_types[node.name]
+        func = @module.functions[node.name]
+        args = node.args.map_with_index do |arg, i|
+          value = gen_expr(arg)
+          expected_type = func_type.params_types[i]
+
+          if value.type != expected_type && value.type.kind == LLVM::Type::Kind::Integer && expected_type.kind == LLVM::Type::Kind::Integer
+            @builder.zext(value, expected_type)
+          else
+            value
+          end
+        end
+        @builder.call(func_type, func, args)
+      else
+        raise "Unknown function: #{node.name}"
+      end
+    end
+
+    def gen_var(node : Ast::VarDeclNode)
+      value = gen_expr(node.value)
+      var_type = get_llvm_type_from_meth(node.type)
+
+      if value.type != var_type && value.type.kind == LLVM::Type::Kind::Integer && var_type.kind == LLVM::Type::Kind::Integer
+        value = @builder.zext(value, var_type)
+      end
+
+      alloca = @builder.alloca(var_type, node.name)
+      @builder.store(value, alloca)
+      @variables[node.name] = LLVMVariable.new(var_type, alloca, true)
     end
 
     def ends_with_return?(body)
@@ -116,35 +192,10 @@ module Meth
         end
       when Ast::CallNode
         gen_call(node)
+      when Ast::VarDeclNode
+        gen_var(node)
       else
         raise "Unhandled statement: #{node}"
-      end
-    end
-
-    def gen_expr(node)
-      case node
-      when Ast::LiteralNode(Int32)
-        @context.int32.const_int(node.value)
-      when Ast::LiteralNode(String)
-        str = node.value
-        global_str = @builder.global_string_pointer(str, "str")
-        @builder.bit_cast(global_str, @context.int8.pointer)
-      when Ast::LiteralNode(Char)
-        @context.int8.const_int(node.value.ord)
-      else
-        raise "Unhandled expr: #{node.class}"
-      end
-    end
-
-    def gen_call(node)
-      if func_type = @function_types[node.name]
-        func = @module.functions[node.name]
-        args = node.args.map do |arg|
-          gen_expr(arg)
-        end
-        @builder.call(func_type, func, args)
-      else
-        raise "Unknown function call: #{node.name}"
       end
     end
   end

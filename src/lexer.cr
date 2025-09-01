@@ -144,6 +144,7 @@ module Meth
       when '(' then make_token(TokenType::LParen, "(")
       when ')' then make_token(TokenType::RParen, ")")
       when ',' then make_token(TokenType::Comma, "'")
+      when '=' then make_token(TokenType::Assign, "=")
       else          make_token(TokenType::Unknown, char.to_s)
       end
     end

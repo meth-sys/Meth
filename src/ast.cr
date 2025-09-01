@@ -15,8 +15,8 @@ module Meth
 
     # Represents a Meth Literal
     #
-    # @see ValueNode(T)
-    # LiteralNode(5) => Int32 Literal (5)
+    # @type  : The type of literal
+    # @value : The value of literal
     class LiteralNode(T) < Node
       property type : T.class
       property value : T
@@ -33,7 +33,8 @@ module Meth
 
     # Represents a Meth Function Patam
     #
-    # ParamNode("args", "Array(String)") => args: Array(String)
+    # @name : The name of param
+    # @name : The expected type of param
     class ParamNode < Node
       property name : String
       property type : String
@@ -48,7 +49,9 @@ module Meth
 
     # Represents a Meth Function GENERIC Param
     #
-    # GenericParamNode("args", "Array(String)") => args: Array(String)
+    # @name         : The name of param
+    # @type         : The expected type of param
+    # @gereric_type : The type of generic
     class GenericParamNode < Node
       property name : String
       property type : String
@@ -69,6 +72,7 @@ module Meth
     # @return_type : The return type (like i32)
     # @params      : The parameters of functions
     # @body        : The body nodes of a function, shouldn't be a Function!
+    # @extern      : Indicates if the function is extern (just declaration)
     class FunctionNode < Node
       property name : String
       property return_type : String
@@ -82,6 +86,7 @@ module Meth
       def fmt_with_indent(indent = 0) : String
         output = "#{pad(indent)}Function: #{name}\n"
         output += "#{pad(indent + 1)}ReturnType: #{return_type}\n"
+        output += "#{pad(indent + 1)}Extern: #{extern}\n"
         output += "#{pad(indent + 1)}Params:\n"
         output += params.map { |p| p.fmt_with_indent(indent + 2) }.join("\n") + "\n"
         output += "#{pad(indent + 1)}Body:\n"
@@ -108,19 +113,18 @@ module Meth
     # Represents a variable declaration
     #
     # @name  : The name of var
-    # @value : The value of var
-    # The type is inferred.
+    # @type  : The type of var
+    # @value  : The value of var
     class VarDeclNode(T) < Node
       property name : String
-      property type : T.class
+      property type : String
       property value : T
 
-      def initialize(@name : String, @value : T)
-        @type = value.class
+      def initialize(@name, @type, @value)
       end
 
       def fmt_with_indent(indent = 0) : String
-        "#{pad(indent)}VarDecl: #{name} = #{value.inspect}"
+        "#{pad(indent)}VarDecl: #{name}: #{type} = #{value.to_s}"
       end
     end
 
@@ -139,6 +143,20 @@ module Meth
         output = "#{pad(indent)}Call: #{name}"
         output += args.map { |a| "\n" + a.fmt_with_indent(indent + 1) }.join
         output
+      end
+    end
+
+    # Represents a Reference to a variable
+    #
+    # @name : The name of referenced variavle
+    class VarRefNode < Node
+      property name : String
+
+      def initialize(@name)
+      end
+
+      def fmt_with_indent(indent = 0) : String
+        "#{pad(indent)}VarRef: #{name}"
       end
     end
   end
