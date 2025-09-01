@@ -1,6 +1,14 @@
 require "llvm"
 require "./ast.cr"
 
+# Represents a LLVM Var
+#
+# @type  : The value type
+# @value : The Value
+# @is_pointer : Indicates if variable is pointer.
+# * why we need known if var is pointer?
+#  When getting var value, if it's a pointer we should load it value
+#  else if it's not a pointer, we can just return it's value.
 class LLVMVariable
   property type : LLVM::Type
   property value : LLVM::Value
@@ -27,17 +35,23 @@ module Meth
       @builder = @context.new_builder
     end
 
-    def gen(nodes : Array(Ast::Node))
+    # generates the LLVM-IR and Returns the Module
+    def gen(nodes : Array(Ast::Node)) : LLVM::Module
+      # first we declare all functions
       nodes.each do |node|
         declare_fun(node) if node.is_a?(Ast::FunctionNode)
       end
+      # now we gen full function with body, except by extern functions
       nodes.each do |node|
         gen_fun(node) if node.is_a?(Ast::FunctionNode) && !node.extern
       end
       @module
     end
 
-    def get_llvm_type_from_meth(meth)
+    # returns the LLVM type based on Meth Type
+    #
+    # example: i32 => @context.i32
+    def get_llvm_type_from_meth(meth : String) : LLVM::Type
       # pointers, count the * in end
       ptr_depth = meth.count('*')
       base_type_str = meth.rstrip('*').strip
@@ -76,6 +90,16 @@ module Meth
       ty
     end
 
+    # declarates a function in IR
+    #
+    # ```
+    #  FunctionNode(
+    #    name: print,
+    #    return_type: i32,
+    #    params: [void*, i64],
+    #    body: []
+    #  ) => declare i32 @print(ptr, i64)
+    # ```
     def declare_fun(fn : Ast::FunctionNode)
       raise "Redeclaration of #{fn.name}" if @module.functions[fn.name]?
       return_type = get_llvm_type_from_meth(fn.return_type)
@@ -91,6 +115,20 @@ module Meth
       @module.functions.add(fn.name, func_type)
     end
 
+    # generates a function entry in IR
+    #
+    # ```
+    #  FunctionNode(
+    #    name: print,
+    #    return_type: i32,
+    #    params: [void*, i64],
+    #    body: []
+    #  ) =>
+    #  define void @print(ptr %0, i64 %1) {
+    #  entry:
+    #    ...
+    #  }
+    # ```
     def gen_fun(fn : Ast::FunctionNode)
       func = @module.functions[fn.name]
       block = func.basic_blocks.append("entry")
@@ -112,6 +150,21 @@ module Meth
       end
     end
 
+    # returns the var in IR
+    #
+    # if var is a pointer it'll generate something like:
+    # ```
+    # %hello1 = load ptr, ptr %hello, align 8
+    # ```
+    # %hello1 is the loaded var
+    # %hello is the raw ptr
+    # it's like :
+    # const char** hello = ...;
+    # const char* hello1 = *hello;
+    #
+    # else if it's not a var, we can return the raw value
+    # cause it's already the value.
+    #
     def get_var(name)
       var = @variables[name]
       raise "Variable #{name} not exists." if var.nil?
@@ -122,6 +175,13 @@ module Meth
       end
     end
 
+    # generates a expression for IR
+    #
+    # it basically translates the Meth value to LLVM Value
+    #
+    # ```
+    # Ast::LiteralNode(5) => @context.int32.const_int(5)
+    # ```
     def gen_expr(node)
       case node
       when Ast::LiteralNode(Int32)
@@ -144,7 +204,17 @@ module Meth
       end
     end
 
-    def gen_call(node)
+    # generates a function call in IR
+    #
+    # ```
+    # Ast::CallNode(
+    #  "print",
+    #  [Ast::LiteralNode("hello"), Ast::LiteralNode(5)]
+    # ) => call void @print(ptr @str, i64 5)
+    # ```
+    #
+    # * Note that `ptr @str` is a ref to hello string.
+    def gen_call(node : Ast::CallNode)
       if func_type = @function_types[node.name]
         func = @module.functions[node.name]
         args = node.args.map_with_index do |arg, i|
@@ -163,6 +233,23 @@ module Meth
       end
     end
 
+    # generates a var decl in IR
+    #
+    # ```
+    # Ast::VarDeclNode(
+    #  "hello",
+    #  "char*",
+    #  "Hello"
+    # ) =>
+    # %hello = alloca ptr, align 8
+    # store ptr @str, ptr %hello, align 8
+    # ```
+    #
+    # another example without pointer:
+    # ```
+    # %age = alloca i32, align 4
+    # store i32 14, ptr %age, align 4
+    # ```
     def gen_var(node : Ast::VarDeclNode)
       value = gen_expr(node.value)
       var_type = get_llvm_type_from_meth(node.type)
@@ -176,11 +263,19 @@ module Meth
       @variables[node.name] = LLVMVariable.new(var_type, alloca, is_pointer: true)
     end
 
+    # check if function ends with return statement
     def ends_with_return?(body)
       last = body.last?
       last.is_a?(Ast::ReturnNode)
     end
 
+    # generates a statement in IR
+    #
+    # Ast::ReturnNode => @builder.ret
+    # Ast::ReturnNode(Ast::LiteralNode(5)) => @builder.ret(gen_expr(Ast::LiteralNode(5)))
+    #
+    # Ast::CallNode => gen_call
+    # Ast::VarDeclNode => node
     def gen_stmt(node)
       case node
       when Ast::ReturnNode
