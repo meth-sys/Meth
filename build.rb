@@ -10,6 +10,7 @@ $option_build = false
 $option_gdb = false
 $option_run = false
 $option_termux = false
+$option_keep = false
 ARGV.each do |arg|
   case arg
     when "--build", "-b"
@@ -20,12 +21,17 @@ ARGV.each do |arg|
       $option_run = true
     when "--termux", "-t"
       $option_termux = true
+    when "--keep", "-k"
+      $option_keep = true
   end
 end
 
 HOME = ENV["HOME"]
 $dest_dir = "#{HOME}/temp/crystal/meth"
 $args = "test/main.mh"
+if $option_keep
+  $args << " --keep"
+end
 
 # Build
 if $option_build
