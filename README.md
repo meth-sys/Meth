@@ -1,10 +1,13 @@
 # Meth
  - Meth is a simple and easy compiled language.
 
-## Syntax
+## Hello, world
 ```
-fun main(args: Args(String)): i32
-  print("Hello, world")
+extern fun puts(value: char*): i64
+
+fun main(): i32
+  puts("Hello, world")
+  return 0
 end
 ```
 

@@ -1,12 +1,8 @@
-extern fun write(fd: i32, data: void*, size: i64): i32
+# Simple hello world!
 
-fun print(data: void*, size: i64)
-  write(1, data, size)
-end
+extern fun puts(value: char*): i64
 
 fun main(): i32
-  char* hello = "Hello"
-  i64 size = 5
-  print(hello, size)
+  puts("Hello, world")
   return 0
 end
