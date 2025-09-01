@@ -15,6 +15,7 @@ module Meth
       @col = 1
     end
 
+    # advances to next token
     private def advance
       if current_char
         if current_char == '\n'
@@ -27,20 +28,30 @@ module Meth
       end
     end
 
+    # skip all whitespaces in the code
     private def skip_whitespace
       while current_char && Util.is_whitespace(current_char.not_nil!)
         advance
       end
     end
 
+    # returns the current characther
+    # if it's out of bounds, return nil
     private def current_char
       @pos < @src.size ? @src[@pos] : nil
     end
 
+    # helper for creating new tokens
+    # just to avoid having to pass line and col
     private def make_token(*args)
       Token.new(*args, @line, @col)
     end
 
+    # parse numbers, 0..9.
+    #
+    # ```
+    # 100 => Token(TokenType::Number, 100)
+    # ```
     private def number
       num = ""
       while current_char && Util.is_digit(current_char.not_nil!)
@@ -50,6 +61,14 @@ module Meth
       make_token(TokenType::Number, num)
     end
 
+    # parse words
+    # it parses identifiers, keywords and types
+    #
+    # ```
+    # fun => Token(TokenType::Keyword, "fun")
+    # char => Token(TokenType::Type, "char")
+    # everything else => Token(TokenType::Identifier, "char")
+    # ```
     private def word
       w = ""
       while current_char && Util.is_word_char(current_char.not_nil!)
@@ -66,6 +85,12 @@ module Meth
       end
     end
 
+    # parse string literals
+    #
+    #
+    # "hello" => Token(TokenType::String, "hello")
+    # "hello\\n" => Token(TokenType::String, "hello\\n")
+    # ```
     private def string
       advance
       str = ""
@@ -88,6 +113,16 @@ module Meth
       make_token(TokenType::String, str)
     end
 
+    # parsw character literal
+    #
+    # ```
+    # 'A'    => Token(TokenType::Char, "A")
+    # '\n'   => Token(TokenType::Char, "\n")
+    # '\t'   => Token(TokenType::Char, "\t")
+    # '\\'   => Token(TokenType::Char, "\\")
+    # '\''   => Token(TokenType::Char, "'")
+    # '"'    => Token(TokenType::Char, "\"")
+    # ```
     private def char
       advance
       if current_char.nil?
@@ -114,6 +149,7 @@ module Meth
       make_token(TokenType::Char, value.to_s)
     end
 
+    # parse the current char and return the token based in it
     private def next_token
       skip_whitespace
       return nil if current_char.nil?
@@ -149,6 +185,9 @@ module Meth
       end
     end
 
+    # parse all tokens until end
+    #
+    # @see self.next_token
     def lex
       tokens = [] of Token
       loop do
