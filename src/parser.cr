@@ -11,21 +11,22 @@ module Meth
       @pos = 0
     end
 
+    # returns the current token
+    # raise if out of bounds.
     def current_token
       raise "Unexpected end of input at position #{@pos}" if @pos >= @tokens.size
       @tokens[@pos]
     end
 
+    # returns the next token without advance
+    # raise if out of bounds.
     def next_token
       raise "Unexpected end of input at position #{@pos + 1}" if (@pos + 1) >= @tokens.size
       @tokens[@pos + 1]
     end
 
-    def token_from(pos)
-      raise "Unexpected end of input at position #{pos}" if pos >= @tokens.size
-      @tokens[pos]
-    end
-
+    # advance if not out of bounds
+    # returns current_token
     def advance
       if @pos < @tokens.size
         @pos += 1
@@ -33,12 +34,15 @@ module Meth
       current_token
     end
 
+    # returns the current token and advance
     def consume
       token = current_token
       advance
       token
     end
 
+    # returns the token if the type is the same as expected
+    # else raise a error
     def expect(type)
       token = current_token
       if token.type == type
@@ -49,6 +53,7 @@ module Meth
       end
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_fun_params
       expect(TokenType::LParen)
       params = [] of Ast::ParamNode | Ast::GenericParamNode
@@ -92,6 +97,7 @@ module Meth
       params
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_fun_ret_type
       return_type = "void"
       if current_token.type == TokenType::Colon
@@ -105,6 +111,7 @@ module Meth
       return_type
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_fun_body
       body = [] of Ast::Node
       while !(current_token.type == TokenType::Keyword && current_token.value == "end")
@@ -114,6 +121,7 @@ module Meth
       body
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_fun
       k_token = expect(TokenType::Keyword)
       raise "[Error #{k_token.line}:#{k_token.col}] Expected 'fun' keyword, got #{k_token.value}" if k_token.value != "fun"
@@ -128,6 +136,7 @@ module Meth
       Ast::FunctionNode.new(name, return_type, params, body)
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_extern_fun
       k_token = expect(TokenType::Keyword)
       raise "[Error #{k_token.line}:#{k_token.col}] Expected 'extern' keyword, got #{k_token.value}" if k_token.value != "extern"
@@ -142,6 +151,7 @@ module Meth
       Ast::FunctionNode.new(name, return_type, params, [] of Ast::Node, extern: true)
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_call(name : String)
       args = [] of Ast::Node
 
@@ -158,6 +168,7 @@ module Meth
       Ast::CallNode.new(name, args)
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_var_decl(type)
       name = expect(TokenType::Identifier).value
       expect(TokenType::Assign)
@@ -166,6 +177,7 @@ module Meth
       Ast::VarDeclNode.new(name, type, value)
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_expression
       case current_token.type
       when TokenType::String
@@ -186,12 +198,14 @@ module Meth
       end
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_return
       k_token = expect(TokenType::Keyword) # should be return
       raise "[Error #{k_token.line}:#{k_token.col}] Expected 'return' keyword, got #{k_token.value}" if k_token.value != "return"
       Ast::ReturnNode.new(parse_expression)
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_identifier
       id = expect(TokenType::Identifier).value
       if current_token.type == TokenType::Identifier
@@ -202,6 +216,7 @@ module Meth
       parse_call(id)
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_type
       type = expect(TokenType::Type).value
       if current_token.type == TokenType::Identifier
@@ -211,6 +226,7 @@ module Meth
       end
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse_statement
       case current_token.type
       when TokenType::Keyword
@@ -236,6 +252,7 @@ module Meth
       end
     end
 
+    # FIXME!!: DOCUMENT THIS FUNCTION
     def parse
       nodes = [] of Ast::Node
 
