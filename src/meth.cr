@@ -6,7 +6,6 @@ module Meth
   extend self
   VERSION = "0.1.0"
 
-  keep = false
   filename = ""
 
   # Process ARGV
@@ -15,8 +14,16 @@ module Meth
     exit 1
   end
 
+  keep = false
+  display_tokens = false
+  display_ast = false
+
   ARGV.each do |arg|
     case arg
+    when "-dt", "--display-tokens"
+      display_tokens = true
+    when "-da", "--display-ast"
+      display_ast = true
     when "-k", "--keep"
       keep = true
     else
@@ -43,13 +50,20 @@ module Meth
   # lex
   lexer = Lexer.new(content)
   tokens = lexer.lex
+  if display_tokens
+    tokens.each do |t|
+      puts t.to_s
+    end
+  end
 
   # parse
   parser = Parser.new(tokens)
   nodes = parser.parse
 
-  nodes.each do |n|
-    puts n.to_s
+  if display_ast
+    nodes.each do |n|
+      puts n.to_s
+    end
   end
 
   LLVM.init_native_target

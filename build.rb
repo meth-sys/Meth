@@ -11,6 +11,8 @@ $option_gdb = false
 $option_run = false
 $option_termux = false
 $option_keep = false
+$option_display_tokens = false
+$option_display_ast = false
 ARGV.each do |arg|
   case arg
     when "--build", "-b"
@@ -23,15 +25,20 @@ ARGV.each do |arg|
       $option_termux = true
     when "--keep", "-k"
       $option_keep = true
+    when "-dt", "--display-tokens"
+      $option_display_tokens = true
+    when "-da", "--display-ast"
+      $option_display_ast = true
   end
 end
 
 HOME = ENV["HOME"]
 $dest_dir = "#{HOME}/temp/crystal/meth"
 $args = "test/main.mh"
-if $option_keep
-  $args << " --keep"
-end
+
+$args << " --keep" if $option_keep
+$args << " --display-tokens" if $option_display_tokens
+$args << " --display-ast" if $option_display_ast
 
 # Build
 if $option_build
