@@ -6,11 +6,11 @@ class LLVMVariable
   property value : LLVM::Value
   property is_pointer : Bool
 
-  def initialize(@type, @value, @is_pointer)
+  def initialize(@type, @value, @is_pointer = false)
   end
 
   def to_s
-    "LLVMVariable: #{type} = #{value}"
+    "LLVMVariable: #{type}#{is_pointer ? "*" : ""} = #{value}"
   end
 end
 
@@ -99,7 +99,7 @@ module Meth
       fn.params.each_with_index do |param, i|
         if param.is_a?(Ast::ParamNode)
           param_type = get_llvm_type_from_meth(param.type)
-          @variables[param.name] = LLVMVariable.new(param_type, func.params[i], false)
+          @variables[param.name] = LLVMVariable.new(param_type, func.params[i])
         end
       end
 
@@ -173,7 +173,7 @@ module Meth
 
       alloca = @builder.alloca(var_type, node.name)
       @builder.store(value, alloca)
-      @variables[node.name] = LLVMVariable.new(var_type, alloca, true)
+      @variables[node.name] = LLVMVariable.new(var_type, alloca, is_pointer: true)
     end
 
     def ends_with_return?(body)
