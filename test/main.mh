@@ -1,3 +1,4 @@
 fun _start()
-  exit (1)
+  # it will cause no exit,
+  # we need asm inline to fix it
 end

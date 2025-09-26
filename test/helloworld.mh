@@ -1,5 +1,5 @@
 # Simple hello world!
-# its not working for not
+# its not working for now cause libc
 
 extern fun puts(value: char*): i64
 
