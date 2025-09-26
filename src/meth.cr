@@ -17,6 +17,7 @@ module Meth
   keep = false
   display_tokens = false
   display_ast = false
+  link_args = [] of String
 
   ARGV.each do |arg|
     case arg
@@ -30,8 +31,12 @@ module Meth
       if filename.empty?
         filename = arg
       else
-        puts "Unexpected argument: #{arg}"
-        exit 1
+        if arg.starts_with?("-")
+          link_args << arg
+        else
+          puts "Unexpected argument: #{arg}"
+          exit 1
+        end
       end
     end
   end
@@ -74,7 +79,7 @@ module Meth
 
   # files
   llvmir_out = filename.sub(/\.\w+$/, ".ll")
-  asm_out = filename.sub(/\.\w+$/, ".s")
+  obj_out = filename.sub(/\.\w+$/, ".o")
   exec_out = filename.sub(/\.\w+$/, "")
 
   # generate IR and write to file
@@ -82,19 +87,20 @@ module Meth
     mod.to_s(f)
   end
 
-  # compile IR to Assembly
-  unless system("llc #{llvmir_out}")
+  # compile IR to Obj
+  unless system("llc #{llvmir_out} --filetype=obj")
     puts "Failed to compile LLVM IR with LLC"
     exit 1
   end
 
-  # compile final executable with gcc
-  unless system("gcc -fsanitize=address -g #{asm_out} -o #{exec_out}")
-    puts "Failed to compile Assembly to Executable."
+  # Link Obj
+  link_cmd = ["ld.lld", obj_out, "-o", exec_out] + link_args
+  unless system(link_cmd.join(" "))
+    puts "Failed to link Object to Executable."
     exit 1
   end
 
   # cleanup
   File.delete(llvmir_out) unless keep
-  File.delete(asm_out) unless keep
+  File.delete(obj_out) unless keep
 end
